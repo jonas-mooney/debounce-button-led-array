@@ -18,7 +18,6 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "stm32l4xx_hal.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -33,6 +32,21 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+#define MAX7219_REG_NOOP        0x00
+#define MAX7219_REG_DIGIT0      0x01
+#define MAX7219_REG_DIGIT1      0x02
+#define MAX7219_REG_DIGIT2      0x03
+#define MAX7219_REG_DIGIT3      0x04
+#define MAX7219_REG_DIGIT4      0x05
+#define MAX7219_REG_DIGIT5      0x06
+#define MAX7219_REG_DIGIT6      0x07
+#define MAX7219_REG_DIGIT7      0x08
+#define MAX7219_REG_DECODEMODE  0x09
+#define MAX7219_REG_INTENSITY   0x0A
+#define MAX7219_REG_SCANLIMIT   0x0B
+#define MAX7219_REG_SHUTDOWN    0x0C
+#define MAX7219_REG_DISPLAYTEST 0x0F
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -41,6 +55,7 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+SPI_HandleTypeDef hspi1;
 
 /* USER CODE BEGIN PV */
 
@@ -49,12 +64,48 @@
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+/* Send a 16-bit address/data pair over SPI */
+void MAX7219_Write(uint8_t address, uint8_t data) {
+    uint8_t packet[2] = {address, data};
+    
+    // Pull CS low to begin frame
+    HAL_GPIO_WritePin(MAX7219_CS_GPIO_Port, MAX7219_CS_Pin, GPIO_PIN_RESET);
+    
+    // Transmit 2 bytes over SPI1
+    HAL_SPI_Transmit(&hspi1, packet, 2, HAL_MAX_DELAY);
+    
+    // Pull CS high to latch data into MAX7219
+    HAL_GPIO_WritePin(MAX7219_CS_GPIO_Port, MAX7219_CS_Pin, GPIO_PIN_SET);
+}
+
+/* Initialize MAX7219 configuration registers */
+void MAX7219_Init(void) {
+    MAX7219_Write(MAX7219_REG_DISPLAYTEST, 0x00); // Disable display test
+    MAX7219_Write(MAX7219_REG_SCANLIMIT,   0x07); // Scan all 8 rows (0-7)
+    MAX7219_Write(MAX7219_REG_DECODEMODE,  0x00); // Raw matrix mode (no BCD decoding)
+    MAX7219_Write(MAX7219_REG_INTENSITY,   0x03); // Set brightness level (0x00 to 0x0F)
+    MAX7219_Write(MAX7219_REG_SHUTDOWN,    0x01); // Wake up display (normal operation)
+    
+    // Clear matrix display memory
+    for (uint8_t row = 1; row <= 8; row++) {
+        MAX7219_Write(row, 0x00);
+    }
+}
+
+/* Display an 8x8 frame buffer (array of 8 bytes) */
+void MAX7219_DisplayBuffer(const uint8_t *buffer) {
+    for (uint8_t i = 0; i < 8; i++) {
+        MAX7219_Write(i + 1, buffer[i]);
+    }
+}
 
 /* USER CODE END 0 */
 
@@ -87,7 +138,34 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
+
+  MAX7219_Init();
+
+  // Example bitmap: Smile pattern
+const uint8_t smile_pattern[8] = {
+    0b00111100,
+    0b01000010,
+    0b10100101,
+    0b10000001,
+    0b10100101,
+    0b10011001,
+    0b01000010,
+    0b00111100
+};
+
+// Example bitmap: Heart pattern
+const uint8_t heart_pattern[8] = {
+    0b00000000,
+    0b01100110,
+    0b11111111,
+    0b11111111,
+    0b01111110,
+    0b00111100,
+    0b00011000,
+    0b00000000
+};
 
   /* USER CODE END 2 */
 
@@ -99,6 +177,8 @@ int main(void)
   /* -- Sample board code to switch on leds ---- */
   BSP_LED_On(LED_GREEN);
 
+  MAX7219_Write(MAX7219_REG_INTENSITY, 0x00);
+
   /* USER CODE END BSP */
 
   /* Infinite loop */
@@ -109,6 +189,12 @@ int main(void)
     /* -- Sample board code to toggle leds ---- */
     BSP_LED_Toggle(LED_GREEN);
     HAL_Delay(1100);
+
+    MAX7219_DisplayBuffer(smile_pattern);
+    HAL_Delay(1000);
+
+    MAX7219_DisplayBuffer(heart_pattern);
+    HAL_Delay(1000);
 
     /* USER CODE END WHILE */
 
@@ -168,6 +254,46 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief SPI1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI1_Init(void)
+{
+
+  /* USER CODE BEGIN SPI1_Init 0 */
+
+  /* USER CODE END SPI1_Init 0 */
+
+  /* USER CODE BEGIN SPI1_Init 1 */
+
+  /* USER CODE END SPI1_Init 1 */
+  /* SPI1 parameter configuration*/
+  hspi1.Instance = SPI1;
+  hspi1.Init.Mode = SPI_MODE_MASTER;
+  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi1.Init.NSS = SPI_NSS_SOFT;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
+  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCPolynomial = 7;
+  hspi1.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
+  hspi1.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
+  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI1_Init 2 */
+
+  /* USER CODE END SPI1_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -182,6 +308,10 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(MAX7219_CS_GPIO_Port, MAX7219_CS_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin : VCP_TX_Pin */
   GPIO_InitStruct.Pin = VCP_TX_Pin;
@@ -190,6 +320,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   GPIO_InitStruct.Alternate = GPIO_AF7_USART2;
   HAL_GPIO_Init(VCP_TX_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : MAX7219_CS_Pin */
+  GPIO_InitStruct.Pin = MAX7219_CS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(MAX7219_CS_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : VCP_RX_Pin */
   GPIO_InitStruct.Pin = VCP_RX_Pin;
