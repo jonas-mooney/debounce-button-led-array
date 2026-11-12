@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "stm32l4xx_hal_gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -183,18 +184,40 @@ const uint8_t heart_pattern[8] = {
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  uint8_t button_was_pressed = 0;
+
   while (1)
   {
 
     /* -- Sample board code to toggle leds ---- */
-    BSP_LED_Toggle(LED_GREEN);
-    HAL_Delay(1100);
+    // BSP_LED_Toggle(LED_GREEN);
+    // HAL_Delay(1100);
 
-    MAX7219_DisplayBuffer(smile_pattern);
-    HAL_Delay(1000);
+    // MAX7219_DisplayBuffer(smile_pattern);
+    // HAL_Delay(1000);
 
-    MAX7219_DisplayBuffer(heart_pattern);
-    HAL_Delay(1000);
+    // MAX7219_DisplayBuffer(heart_pattern);
+    // HAL_Delay(1000);
+
+    if (HAL_GPIO_ReadPin(push_button_GPIO_Port, push_button_Pin) == GPIO_PIN_RESET) {
+      // Wait 50ms for mechanical switch bounce to settle
+      HAL_Delay(50);
+
+      // Check again to confirm it is a real press and hasn't already been handled
+      if (HAL_GPIO_ReadPin(push_button_GPIO_Port, push_button_Pin) == GPIO_PIN_RESET && button_was_pressed == 0)
+      {
+        button_was_pressed = 1;
+
+        // ---> PUT YOUR ACTION HERE <---
+        // Example: Toggle an onboard LED on PC13 or PA5
+        BSP_LED_Toggle(LED_GREEN);
+      }
+    }
+    else
+    {
+      // Reset the flag when you let go of the button
+      button_was_pressed = 0;
+    }
 
     /* USER CODE END WHILE */
 
@@ -320,6 +343,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   GPIO_InitStruct.Alternate = GPIO_AF7_USART2;
   HAL_GPIO_Init(VCP_TX_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : push_button_Pin */
+  GPIO_InitStruct.Pin = push_button_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(push_button_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : MAX7219_CS_Pin */
   GPIO_InitStruct.Pin = MAX7219_CS_Pin;

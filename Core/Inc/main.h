@@ -63,6 +63,8 @@ void Error_Handler(void);
 #define MCO_GPIO_Port GPIOA
 #define VCP_TX_Pin GPIO_PIN_2
 #define VCP_TX_GPIO_Port GPIOA
+#define push_button_Pin GPIO_PIN_5
+#define push_button_GPIO_Port GPIOA
 #define MAX7219_CS_Pin GPIO_PIN_0
 #define MAX7219_CS_GPIO_Port GPIOB
 #define SWDIO_Pin GPIO_PIN_13
