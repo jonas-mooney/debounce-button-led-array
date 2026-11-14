@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "stm32l4xx_hal_gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -26,6 +27,11 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+typedef enum {
+    BUTTON_STATE_IDLE = 0,
+    BUTTON_STATE_DEBOUNCING,
+    BUTTON_STATE_WAIT_RELEASE
+} ButtonState_t;
 
 /* USER CODE END PTD */
 
@@ -167,6 +173,9 @@ const uint8_t heart_pattern[8] = {
     0b00000000
 };
 
+  static ButtonState_t button_state = BUTTON_STATE_IDLE;
+  static uint32_t debounce_start_tick = 0;
+
   /* USER CODE END 2 */
 
   /* Initialize leds */
@@ -183,18 +192,42 @@ const uint8_t heart_pattern[8] = {
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
   while (1)
   {
+    switch (button_state) {
+        case BUTTON_STATE_IDLE:
+            // Check if button is pressed (assuming active-low / GPIO_PIN_RESET)
+            if (HAL_GPIO_ReadPin(push_button_GPIO_Port, push_button_Pin) == GPIO_PIN_RESET) {
+                debounce_start_tick = HAL_GetTick(); // Record the time the press started
+                button_state = BUTTON_STATE_DEBOUNCING;
+            }
+            break;
 
-    /* -- Sample board code to toggle leds ---- */
-    BSP_LED_Toggle(LED_GREEN);
-    HAL_Delay(1100);
+        case BUTTON_STATE_DEBOUNCING:
+            // Check if the button is still pressed
+            if (HAL_GPIO_ReadPin(push_button_GPIO_Port, push_button_Pin) == GPIO_PIN_RESET) {
+                // Has 50ms elapsed since the initial press detection?
+                if ((HAL_GetTick() - debounce_start_tick) >= 50) {
+                    // Confirmed valid press! Execute your action.
+                    BSP_LED_Toggle(LED_GREEN);
+                    
+                    // Move to state where we wait for the user to let go
+                    button_state = BUTTON_STATE_WAIT_RELEASE;
+                }
+            } else {
+                // Button was released early (it was just electrical noise/bounce)
+                button_state = BUTTON_STATE_IDLE;
+            }
+            break;
 
-    MAX7219_DisplayBuffer(smile_pattern);
-    HAL_Delay(1000);
-
-    MAX7219_DisplayBuffer(heart_pattern);
-    HAL_Delay(1000);
+        case BUTTON_STATE_WAIT_RELEASE:
+            // Wait until the button is released (GPIO_PIN_SET)
+            if (HAL_GPIO_ReadPin(push_button_GPIO_Port, push_button_Pin) == GPIO_PIN_SET) {
+                button_state = BUTTON_STATE_IDLE;
+            }
+            break;
+    }
 
     /* USER CODE END WHILE */
 
@@ -320,6 +353,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   GPIO_InitStruct.Alternate = GPIO_AF7_USART2;
   HAL_GPIO_Init(VCP_TX_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : push_button_Pin */
+  GPIO_InitStruct.Pin = push_button_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(push_button_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : MAX7219_CS_Pin */
   GPIO_InitStruct.Pin = MAX7219_CS_Pin;
