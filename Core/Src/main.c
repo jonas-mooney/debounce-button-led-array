@@ -161,6 +161,17 @@ const uint8_t smile_pattern[8] = {
     0b00111100
 };
 
+const uint8_t number_one[8] = {
+  0b00011000,
+  0b00111000,
+  0b01111000,
+  0b00011000,
+  0b00011000,
+  0b00011000,
+  0b01111110,
+  0b01111110
+};
+
 // Example bitmap: Heart pattern
 const uint8_t heart_pattern[8] = {
     0b00000000,
@@ -211,6 +222,7 @@ const uint8_t heart_pattern[8] = {
                 if ((HAL_GetTick() - debounce_start_tick) >= 50) {
                     // Confirmed valid press! Execute your action.
                     BSP_LED_Toggle(LED_GREEN);
+                    MAX7219_DisplayBuffer(number_one);
                     
                     // Move to state where we wait for the user to let go
                     button_state = BUTTON_STATE_WAIT_RELEASE;
